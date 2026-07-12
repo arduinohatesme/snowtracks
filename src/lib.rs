@@ -18,7 +18,7 @@ use clap::{ArgMatches, Command, arg};
 ///        .arg(arg!(<NAME> "Your name"))
 /// }
 ///
-/// let matches = my_cli().get_matches_from(vec!["my_command", "John Smith"]);
+/// let matches = my_cli().try_get_matches_from(vec!["my_command", "John Smith"]).unwrap();
 /// let arg = get_from_args(&matches, "NAME");
 /// assert_eq!(arg, "John Smith".to_string());
 /// ```
@@ -38,10 +38,10 @@ pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> String {
 /// # Examples
 ///
 /// ```
-/// use clap::{ArgMatches, Command, arg};
-/// use snowtracks::{cli, get_from_args, setup};
+/// # use clap::{ArgMatches, Command, arg};
+/// # use snowtracks::{cli, get_from_args, setup};
 ///
-/// let matches = cli().get_matches_from(vec!["snow", "setup"]);
+/// let matches = cli().try_get_matches_from(vec!["snow", "setup"]).unwrap();
 /// if let Some(sub_matches) = matches.subcommand_matches("setup") {
 ///     setup(&sub_matches);
 /// } else {
@@ -71,10 +71,10 @@ pub fn setup(matches: &ArgMatches) {
 /// # Examples
 ///
 /// ```
-/// use clap::{ArgMatches, Command, arg};
-/// use snowtracks::{add, cli, get_from_args};
+/// # use clap::{ArgMatches, Command, arg};
+/// # use snowtracks::{add, cli, get_from_args};
 ///
-/// let matches = cli().get_matches_from(vec!["snow", "add"]);
+/// let matches = cli().try_get_matches_from(vec!["snow", "add"]).unwrap();
 /// if let Some(sub_matches) = matches.subcommand_matches("add") {
 ///     add(&sub_matches);
 /// } else {
@@ -88,6 +88,70 @@ pub fn add(matches: &ArgMatches) {
     }
 }
 
+/// The main clap entry point for the snowtracks CLI
+///
+/// # Examples
+///
+/// ```
+/// # use clap::{ArgMatches, Command, arg};
+/// # use snowtracks::cli;
+///
+/// let setup_matches = cli().try_get_matches_from(vec!["snow", "setup"]).unwrap();
+/// let setup_with_name_matches = cli()
+///     .try_get_matches_from(vec!["snow", "setup", "--name", "your_db"])
+///     .unwrap();
+///
+/// let (sub_command, sub_matches) = setup_matches.subcommand().unwrap();
+/// let (sub_with_name_command, sub_with_name_matches) =
+///     setup_with_name_matches.subcommand().unwrap();
+///
+/// assert_eq!(sub_command, "setup");
+/// assert_eq!(sub_with_name_command, "setup");
+/// assert!(sub_matches.get_one::<String>("name").is_none());
+/// assert_eq!(
+///     sub_with_name_matches.get_one::<String>("name").unwrap(),
+///     "your_db"
+/// );
+/// ```
+///
+/// ```
+/// # use clap::{ArgMatches, Command, arg};
+/// # use snowtracks::cli;
+///
+/// let add_matches = cli().try_get_matches_from(vec!["snow", "add"]).unwrap();
+/// let add_with_params_matches = cli()
+///     .try_get_matches_from(vec![
+///         "snow", "add", "-n", "My
+/// Task", "-t", "medium", "-p", "done",
+///     ])
+///     .unwrap();
+///
+/// let (sub_command, sub_matches) = add_matches.subcommand().unwrap();
+/// let (sub_with_params_command, sub_with_params_matches) =
+///     add_with_params_matches.subcommand().unwrap();
+///
+/// assert_eq!(sub_command, "add");
+/// assert_eq!(sub_with_params_command, "add");
+/// assert!(sub_matches.get_one::<String>("triage").is_none());
+/// assert_eq!(
+///     sub_with_params_matches.get_one::<String>("triage").unwrap(),
+///     "medium"
+/// );
+/// ```
+///
+/// ```
+/// # use clap::{ArgMatches, Command, arg};
+/// # use snowtracks::cli;
+///
+/// let delete_matches = cli()
+///     .try_get_matches_from(vec!["snow", "delete", "42"])
+///     .unwrap();
+///
+/// let (sub_command, sub_matches) = delete_matches.subcommand().unwrap();
+///
+/// assert_eq!(sub_command, "delete");
+/// assert_eq!(sub_matches.get_one::<String>("ID").unwrap(), "42");
+/// ```
 pub fn cli() -> Command {
     Command::new("snow")
         .about("Yet another rust-based task tracker")
