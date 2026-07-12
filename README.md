@@ -1,2 +1,2 @@
 # snowtracks
-Yet another minimalistic task tracker, written in Python.
+Yet another minimalistic task tracker, written in Rust.
