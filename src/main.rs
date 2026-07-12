@@ -7,7 +7,7 @@ fn main() {
 
     match matches.subcommand() {
         Some(("setup", sub_matches)) => {
-            setup(sub_matches);
+            setup(sub_matches).unwrap();
         }
         Some(("add", sub_matches)) => {
             add(sub_matches);

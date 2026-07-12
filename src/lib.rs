@@ -1,6 +1,18 @@
 use clap::{ArgMatches, Command, arg};
+use serde::{Deserialize, Serialize};
+use std::{
+    env,
+    fs::{self, create_dir, exists, read_dir},
+    io::{self, Write},
+};
+use users::get_current_username;
 
-/// Gets a string from arguments, defaulting to empty.
+#[derive(Serialize, Deserialize)]
+struct Config {
+    databases: Vec<String>,
+}
+
+/// Gets a string from arguments, defaulting to an empty String.
 ///
 /// # Arguments
 ///
@@ -22,14 +34,15 @@ use clap::{ArgMatches, Command, arg};
 /// let arg = get_from_args(&matches, "NAME");
 /// assert_eq!(arg, "John Smith".to_string());
 /// ```
-pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> String {
-    return matches
-        .get_one::<String>(tgt)
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "".to_string());
+#[doc(hidden)]
+pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> Option<String> {
+    return matches.get_one::<String>(tgt).map(|s| s.to_string());
 }
 
 /// Sets up database for task tracking
+/// Name defaults to <username>_db
+/// Path defaults to $XDG_DATA_HOME
+/// Fails if path is not empty
 ///
 /// # Arguments
 ///
@@ -55,11 +68,71 @@ pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> String {
 ///     panic!("Error: Setup subcommand not triggered.");
 /// }
 /// ```
-pub fn setup(matches: &ArgMatches) {
-    let db_name = get_from_args(matches, "name");
-    if db_name != "" {
-        println!("Setting up database named {}", db_name)
+pub fn setup(matches: &ArgMatches) -> io::Result<()> {
+    let db_name = match get_from_args(matches, "name") {
+        Some(arg) => arg,
+        None => get_current_username()
+            .and_then(|os_str| os_str.into_string().ok())
+            .unwrap_or_else(|| "unknown".to_string()),
+    };
+
+    let db_dir = match get_from_args(matches, "path") {
+        Some(arg) => arg,
+        None => format!(
+            "{}/snowtracks",
+            env::var("XDG_DATA_HOME").unwrap_or("./snowtracks-db".to_string())
+        ),
+    };
+
+    println!("==> Setting up database \"{}\" ({})", db_name, db_dir);
+    println!("  [-] Creating database directory");
+
+    if !exists(&db_dir).unwrap() {
+        create_dir(&db_dir).unwrap();
     }
+
+    if read_dir(&db_dir).unwrap().next().is_some() {
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!("Database directory {} is not empty!", db_dir),
+        ));
+    }
+
+    print!("\x1b[An\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("   [+] Created database directory");
+    println!("   [-] Creating configuration directory");
+
+    let cfg_dir = match env::var("XDG_CONFIG_HOME") {
+        Ok(path) => format!("{}/snowtracks", path),
+        Err(_) => "./snowtracks-cfg".to_string(),
+    };
+
+    if !exists(&cfg_dir).unwrap() {
+        create_dir(&cfg_dir).unwrap();
+    }
+
+    print!("\x1b[An\x1b[2K");
+    println!("   [+] Created configuration directory");
+
+    let cfg_file = format!("{}/snowtracks.toml", cfg_dir);
+
+    if !exists(&cfg_file).unwrap() {
+        println!("    [-] Generating base config ({})", &cfg_file);
+        let cfg_obj: Config = Config {
+            databases: vec![cfg_file.clone()],
+        };
+        fs::write(
+            &cfg_file,
+            toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct!"),
+        )
+        .expect("Failed to write config!");
+        println!("    [+] Base config generated ({})", &cfg_file)
+    } else {
+        println!("    [-] Validating existing config ({})", &cfg_file)
+    }
+
+    Ok(())
 }
 
 /// Adds a task to the database
@@ -82,10 +155,12 @@ pub fn setup(matches: &ArgMatches) {
 /// }
 /// ```
 pub fn add(matches: &ArgMatches) {
-    let task_name = get_from_args(matches, "name");
-    if task_name != "" {
-        println!("The first argument was {}", task_name)
-    }
+    let _task_name = match get_from_args(matches, "name") {
+        Some(arg) => arg,
+        None => "".to_string(),
+        // TODO: ^^^ Add interactive input here
+        // as well as for other optional args
+    };
 }
 
 /// The main clap entry point for the snowtracks CLI
@@ -121,8 +196,14 @@ pub fn add(matches: &ArgMatches) {
 /// let add_matches = cli().try_get_matches_from(vec!["snow", "add"]).unwrap();
 /// let add_with_params_matches = cli()
 ///     .try_get_matches_from(vec![
-///         "snow", "add", "-n", "My
-/// Task", "-t", "medium", "-p", "done",
+///         "snow",
+///         "add",
+///         "-n",
+///         "The task at hand",
+///         "-t",
+///         "medium",
+///         "-p",
+///         "done",
 ///     ])
 ///     .unwrap();
 ///
@@ -154,14 +235,15 @@ pub fn add(matches: &ArgMatches) {
 /// ```
 pub fn cli() -> Command {
     Command::new("snow")
-        .about("Yet another rust-based task tracker")
+        .about("Don't lose yourself in a blizzard of thoughts.")
         .subcommand_required(true)
         .arg_required_else_help(true)
         .allow_external_subcommands(true)
         .subcommand(
             Command::new("setup")
                 .about("Setup the snowtracks database")
-                .arg(arg!(-n --name [NAME] "The name of the database")),
+                .arg(arg!(-n --name [NAME] "The name of the database"))
+                .arg(arg!(-p --path [PATH] "The destination path of the database")),
         )
         .subcommand(
             Command::new("add")
