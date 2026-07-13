@@ -1,8 +1,9 @@
 use clap::{ArgMatches, Command, arg};
+use json::{array, object};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
-    fs::{self, create_dir, exists, read_dir},
+    fs::{self, create_dir, exists},
     io::{self, Write},
 };
 use users::get_current_username;
@@ -85,23 +86,16 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     };
 
     println!("==> Setting up database \"{}\" ({})", db_name, db_dir);
-    println!("  [-] Creating database directory");
 
     if !exists(&db_dir).unwrap() {
+        println!("[-] Creating database directory");
         create_dir(&db_dir).unwrap();
+        print!("\x1b[An\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Created database directory");
+    } else {
+        println!("[+] Database directory already exists");
     }
-
-    if read_dir(&db_dir).unwrap().next().is_some() {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            format!("Database directory {} is not empty!", db_dir),
-        ));
-    }
-
-    print!("\x1b[An\x1b[2K");
-    std::io::stdout().flush()?;
-    println!("   [+] Created database directory");
-    println!("   [-] Creating configuration directory");
 
     let cfg_dir = match env::var("XDG_CONFIG_HOME") {
         Ok(path) => format!("{}/snowtracks", path),
@@ -109,28 +103,76 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     };
 
     if !exists(&cfg_dir).unwrap() {
+        println!("[-] Creating configuration directory");
         create_dir(&cfg_dir).unwrap();
+        print!("\x1b[An\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Created configuration directory");
+    } else {
+        println!("[+] Configuration directory already exists");
     }
 
-    print!("\x1b[An\x1b[2K");
-    println!("   [+] Created configuration directory");
+    // TODO: Make DB and check if one already exists
+    let db_task_file = format!("{}/{}.json", &cfg_dir, db_name);
+    if !exists(&db_task_file)? {
+        println!("[-] Creating database task file");
+        fs::write(
+            &db_task_file,
+            object! {name: db_name.as_str(), tasks: array![]}.dump(),
+        )
+        .unwrap();
+        print!("\x1b[An\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Created database task file");
+    } else {
+        println!("[+] Database task file already exists");
+    }
 
     let cfg_file = format!("{}/snowtracks.toml", cfg_dir);
 
     if !exists(&cfg_file).unwrap() {
-        println!("    [-] Generating base config ({})", &cfg_file);
+        println!("[-] Generating base config ({})", &cfg_file);
         let cfg_obj: Config = Config {
             databases: vec![cfg_file.clone()],
         };
+
         fs::write(
             &cfg_file,
             toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct!"),
         )
         .expect("Failed to write config!");
-        println!("    [+] Base config generated ({})", &cfg_file)
-    } else {
-        println!("    [-] Validating existing config ({})", &cfg_file)
+
+        print!("\x1b[An\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Base config generated ({})", &cfg_file);
+        return Ok(());
     }
+
+    println!("[-] Checking existing config ({})", &cfg_file);
+    let cfg_str = fs::read_to_string(&cfg_file)?;
+    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file!");
+
+    if cfg_obj.databases.contains(&db_dir) {
+        print!("\x1b[An\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Database already in config ({})", &db_dir);
+        return Ok(());
+    }
+
+    print!("\x1b[An\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[-] Adding database to existing config ({})", &cfg_file);
+
+    cfg_obj.databases.push(db_dir);
+    fs::write(
+        &cfg_file,
+        toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct!"),
+    )
+    .expect("Failed to write new config!");
+
+    print!("\x1b[An\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] New database added to config ({})", &cfg_file);
 
     Ok(())
 }
