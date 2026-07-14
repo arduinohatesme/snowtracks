@@ -1,5 +1,4 @@
 use clap::{ArgMatches, Command, arg};
-use json::{array, object};
 use serde::{Deserialize, Serialize};
 use std::{
     env,
@@ -9,8 +8,54 @@ use std::{
 use users::get_current_username;
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Config {
     databases: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum TaskSize {
+    XXS,
+    XS,
+    S,
+    M,
+    L,
+    XL,
+    XXL,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum TaskTriage {
+    Low,
+    Medium,
+    High,
+    Urgent,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum TaskStatus {
+    Todo,
+    InProg,
+    Done,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Task {
+    name: String,
+    triage: TaskTriage,
+    status: TaskStatus,
+    size: TaskSize,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TasksDatabase {
+    name: String,
+    tasks: Vec<Task>,
 }
 
 /// Gets a string from arguments, defaulting to an empty String.
@@ -112,13 +157,16 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Configuration directory already exists");
     }
 
-    // TODO: Make DB and check if one already exists
     let db_task_file = format!("{}/{}.json", &cfg_dir, db_name);
     if !exists(&db_task_file)? {
         println!("[-] Creating database task file");
+        let base_db = TasksDatabase {
+            name: db_name,
+            tasks: vec![],
+        };
         fs::write(
             &db_task_file,
-            object! {name: db_name.as_str(), tasks: array![]}.dump(),
+            serde_json::to_string(&base_db).expect("Failed to serialize base tasks file!"),
         )
         .unwrap();
         print!("\x1b[An\r\x1b[2K");
@@ -126,6 +174,15 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Created database task file");
     } else {
         println!("[+] Database task file already exists");
+        println!("[-] Validating database task file");
+        let db_contents_str =
+            fs::read_to_string(&db_task_file).expect("Failed to read database task file!");
+        let _db_contents: TasksDatabase = serde_json::from_str(&db_contents_str)
+            .expect("Failed to cast database tasks to TasksDatabase!");
+
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Validated database task file");
     }
 
     let cfg_file = format!("{}/snowtracks.toml", cfg_dir);
