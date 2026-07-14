@@ -85,6 +85,26 @@ pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> Option<String> {
     return matches.get_one::<String>(tgt).map(|s| s.to_string());
 }
 
+/// Validates database tasks
+/// Returns Err if invalid
+///
+/// # Invalid Cases
+/// * File does not exist
+/// * File is not valid JSON
+/// * File JSON cannot be casted to TasksDatabase
+///
+/// # Arguments
+///
+/// * `file_path` - File path to check
+fn validate_tasks_file(file_path: &str) -> io::Result<()> {
+    let db_contents_str = fs::read_to_string(&file_path)
+        .expect(&format!("Failed to read database task file {}", file_path));
+    let _db_contents: TasksDatabase = serde_json::from_str(&db_contents_str)
+        .expect("Failed to cast database tasks to TasksDatabase");
+
+    Ok(())
+}
+
 /// Sets up database for task tracking
 /// Name defaults to <username>_db
 /// Path defaults to $XDG_DATA_HOME
@@ -142,10 +162,33 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Database directory already exists");
     }
 
+    let db_task_file = format!("{}/tasks.json", &db_dir);
+    if !exists(&db_task_file)? {
+        println!("[-] Creating database task file");
+
+        let base_db = TasksDatabase {
+            name: db_name,
+            tasks: vec![],
+        };
+        fs::write(
+            &db_task_file,
+            serde_json::to_string(&base_db).expect("Failed to serialize base tasks file"),
+        )
+        .unwrap();
+
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Created database task file");
+    } else {
+        println!("[+] Database task file already exists");
+    }
+
     let cfg_dir = match env::var("XDG_CONFIG_HOME") {
         Ok(path) => format!("{}/snowtracks", path),
         Err(_) => "./snowtracks-cfg".to_string(),
     };
+
+    let cfg_file = format!("{}/snowtracks.toml", cfg_dir);
 
     if !exists(&cfg_dir).unwrap() {
         println!("[-] Creating configuration directory");
@@ -157,79 +200,61 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Configuration directory already exists");
     }
 
-    let db_task_file = format!("{}/{}.json", &cfg_dir, db_name);
-    if !exists(&db_task_file)? {
-        println!("[-] Creating database task file");
-        let base_db = TasksDatabase {
-            name: db_name,
-            tasks: vec![],
-        };
-        fs::write(
-            &db_task_file,
-            serde_json::to_string(&base_db).expect("Failed to serialize base tasks file!"),
-        )
-        .unwrap();
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] Created database task file");
-    } else {
-        println!("[+] Database task file already exists");
-        println!("[-] Validating database task file");
-        let db_contents_str =
-            fs::read_to_string(&db_task_file).expect("Failed to read database task file!");
-        let _db_contents: TasksDatabase = serde_json::from_str(&db_contents_str)
-            .expect("Failed to cast database tasks to TasksDatabase!");
-
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] Validated database task file");
-    }
-
-    let cfg_file = format!("{}/snowtracks.toml", cfg_dir);
-
     if !exists(&cfg_file).unwrap() {
-        println!("[-] Generating base config ({})", &cfg_file);
+        println!("[-] Generating base config");
         let cfg_obj: Config = Config {
-            databases: vec![cfg_file.clone()],
+            databases: vec![db_dir.clone()],
         };
 
         fs::write(
             &cfg_file,
-            toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct!"),
+            toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct"),
         )
-        .expect("Failed to write config!");
+        .expect("Failed to write config");
 
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
-        println!("[+] Base config generated ({})", &cfg_file);
+        println!("[+] Base config generated");
         return Ok(());
     }
 
-    println!("[-] Checking existing config ({})", &cfg_file);
     let cfg_str = fs::read_to_string(&cfg_file)?;
-    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file!");
+    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
 
-    if cfg_obj.databases.contains(&db_dir) {
+    if !cfg_obj.databases.contains(&db_dir) {
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[-] Adding database to existing config ({})", &cfg_file);
+
+        cfg_obj.databases.push(db_dir);
+        fs::write(
+            &cfg_file,
+            toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
+        )
+        .expect("Failed to write new config");
+
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] New database added to config ({})", &cfg_file);
+    } else {
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Database already in config ({})", &db_dir);
-        return Ok(());
+    }
+
+    println!("[-] Validating config");
+
+    for db in &cfg_obj.databases {
+        let tasks_path = format!("{}/tasks.json", db);
+        validate_tasks_file(&tasks_path)
+            .expect(&format!("Failed to validate tasks file at {}", &tasks_path));
     }
 
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
-    println!("[-] Adding database to existing config ({})", &cfg_file);
+    println!("[+] Validated config");
 
-    cfg_obj.databases.push(db_dir);
-    fs::write(
-        &cfg_file,
-        toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct!"),
-    )
-    .expect("Failed to write new config!");
-
-    print!("\x1b[An\r\x1b[2K");
-    std::io::stdout().flush()?;
-    println!("[+] New database added to config ({})", &cfg_file);
+    println!("==> Finished setup!");
 
     Ok(())
 }
