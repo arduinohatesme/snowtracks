@@ -90,7 +90,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     if !exists(&db_dir).unwrap() {
         println!("[-] Creating database directory");
         create_dir(&db_dir).unwrap();
-        print!("\x1b[An\x1b[2K");
+        print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Created database directory");
     } else {
@@ -105,7 +105,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     if !exists(&cfg_dir).unwrap() {
         println!("[-] Creating configuration directory");
         create_dir(&cfg_dir).unwrap();
-        print!("\x1b[An\x1b[2K");
+        print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Created configuration directory");
     } else {
@@ -121,7 +121,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
             object! {name: db_name.as_str(), tasks: array![]}.dump(),
         )
         .unwrap();
-        print!("\x1b[An\x1b[2K");
+        print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Created database task file");
     } else {
@@ -142,7 +142,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         )
         .expect("Failed to write config!");
 
-        print!("\x1b[An\x1b[2K");
+        print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Base config generated ({})", &cfg_file);
         return Ok(());
@@ -153,13 +153,13 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file!");
 
     if cfg_obj.databases.contains(&db_dir) {
-        print!("\x1b[An\x1b[2K");
+        print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Database already in config ({})", &db_dir);
         return Ok(());
     }
 
-    print!("\x1b[An\x1b[2K");
+    print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
     println!("[-] Adding database to existing config ({})", &cfg_file);
 
@@ -170,7 +170,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     )
     .expect("Failed to write new config!");
 
-    print!("\x1b[An\x1b[2K");
+    print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
     println!("[+] New database added to config ({})", &cfg_file);
 
@@ -283,13 +283,13 @@ pub fn cli() -> Command {
         .allow_external_subcommands(true)
         .subcommand(
             Command::new("setup")
-                .about("Setup the snowtracks database")
+                .about("Setup a snowtracks database")
                 .arg(arg!(-n --name [NAME] "The name of the database"))
                 .arg(arg!(-p --path [PATH] "The destination path of the database")),
         )
         .subcommand(
             Command::new("add")
-                .about("Add a task to the tracker")
+                .about("Add a task to a tracker")
                 .arg(arg!(-n --name [NAME] "The name of the task"))
                 .arg(arg!(-t --triage [TRIAGE] "The triage level of the task"))
                 .arg(arg!(-p --progress [PROGRESS] "The progress level of the task")),
