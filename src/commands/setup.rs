@@ -1,4 +1,4 @@
-use crate::utils::{Config, TasksDatabase, get_from_args};
+use crate::utils::{Config, TasksDatabase, get_from_args, get_input_in};
 use clap::ArgMatches;
 use std::env;
 use std::sync::OnceLock;
@@ -9,31 +9,6 @@ use std::{
 use users::get_current_username;
 
 static CONFIG_FILE_PATH: OnceLock<String> = OnceLock::new();
-
-fn get_input_in(possible: Vec<&str>, buf: &mut String) -> io::Result<()> {
-    let mut ran_before = false;
-    loop {
-        if ran_before {
-            print!("\x1b[An\r\x1b[2K");
-            print!("Invalid input. Try again: ");
-            io::stdout().flush()?;
-        }
-        buf.clear();
-        io::stdin().read_line(buf)?;
-
-        let clean_buf = buf.trim().to_lowercase();
-        ran_before = true;
-
-        if possible.contains(&clean_buf.as_str()) {
-            break;
-        }
-    }
-
-    print!("\x1b[An\r\x1b[2K");
-    print!("\x1b[An\r\x1b[2K");
-    Ok(())
-}
-
 /// Validates database tasks
 /// Returns Err if invalid
 ///
@@ -81,7 +56,11 @@ fn prompt_remove_database_from_config(db_path: &str) -> io::Result<()> {
     io::stdout().flush()?;
 
     let mut buf = "".to_string();
-    get_input_in(vec!["y", "n", ""], &mut buf).unwrap();
+    get_input_in(
+        &["y".to_string(), "n".to_string(), "".to_string()],
+        &mut buf,
+    )
+    .unwrap();
     buf = buf.trim().to_lowercase();
 
     if buf == "n" {

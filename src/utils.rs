@@ -1,5 +1,7 @@
 use clap::ArgMatches;
 use serde::{Deserialize, Serialize};
+use std::io::{self, Write};
+use strum::{Display, EnumIter, EnumString, FromRepr};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -7,100 +9,42 @@ pub struct Config {
     pub databases: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "lowercase")]
+#[repr(i32)]
 pub enum TaskSize {
-    XXS,
-    XS,
-    S,
-    M,
-    L,
-    XL,
-    XXL,
+    XXS = 0,
+    XS = 1,
+    S = 3,
+    M = 4,
+    L = 5,
+    XL = 6,
+    XXL = 7,
 }
 
-impl TaskSize {
-    pub fn to_int(&self) -> i32 {
-        match self {
-            TaskSize::XXS => 0,
-            TaskSize::XS => 1,
-            TaskSize::S => 2,
-            TaskSize::M => 4,
-            TaskSize::L => 5,
-            TaskSize::XL => 6,
-            TaskSize::XXL => 7,
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            TaskSize::XXS => "XXS".to_string(),
-            TaskSize::XS => "XS".to_string(),
-            TaskSize::S => "S".to_string(),
-            TaskSize::M => "M".to_string(),
-            TaskSize::L => "L".to_string(),
-            TaskSize::XL => "XL".to_string(),
-            TaskSize::XXL => "XXL".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "lowercase")]
+#[repr(i32)]
 pub enum TaskTriage {
-    Low,
-    Medium,
-    High,
-    Urgent,
+    Low = 0,
+    Medium = 1,
+    High = 2,
+    Urgent = 3,
 }
 
-impl TaskTriage {
-    pub fn to_int(&self) -> i32 {
-        match self {
-            TaskTriage::Low => 0,
-            TaskTriage::Medium => 1,
-            TaskTriage::High => 2,
-            TaskTriage::Urgent => 3,
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            TaskTriage::Low => "Low".to_string(),
-            TaskTriage::Medium => "Medium".to_string(),
-            TaskTriage::High => "High".to_string(),
-            TaskTriage::Urgent => "Urgent".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
+#[strum(serialize_all = "lowercase")]
+#[repr(i32)]
 pub enum TaskStatus {
-    Todo,
-    InProg,
-    Done,
+    Todo = 0,
+    InProg = 1,
+    Done = 2,
 }
 
-impl TaskStatus {
-    pub fn to_int(&self) -> i32 {
-        match self {
-            TaskStatus::Todo => 0,
-            TaskStatus::InProg => 1,
-            TaskStatus::Done => 2,
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self {
-            TaskStatus::Todo => "To-do".to_string(),
-            TaskStatus::InProg => "In Progress".to_string(),
-            TaskStatus::Done => "Done".to_string(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Task {
     pub name: String,
@@ -114,6 +58,30 @@ pub struct Task {
 pub struct TasksDatabase {
     pub name: String,
     pub tasks: Vec<Task>,
+}
+
+pub fn get_input_in(possible: &[String], buf: &mut String) -> io::Result<()> {
+    let mut ran_before = false;
+    loop {
+        if ran_before {
+            print!("\x1b[An\r\x1b[2K");
+            print!("Invalid input. Try again: ");
+            io::stdout().flush()?;
+        }
+        buf.clear();
+        io::stdin().read_line(buf)?;
+
+        let clean_buf = buf.trim().to_lowercase();
+        ran_before = true;
+
+        if possible.contains(&clean_buf) {
+            break;
+        }
+    }
+
+    print!("\x1b[An\r\x1b[2K");
+    print!("\x1b[An\r\x1b[2K");
+    Ok(())
 }
 
 /// Gets a string from arguments, defaulting to an empty String.
