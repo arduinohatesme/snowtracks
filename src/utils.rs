@@ -13,7 +13,7 @@ pub struct Config {
 
 #[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
-#[strum(serialize_all = "lowercase")]
+#[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 #[repr(i32)]
 pub enum TaskSize {
     XXS = 0,
@@ -27,7 +27,7 @@ pub enum TaskSize {
 
 #[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
-#[strum(serialize_all = "lowercase")]
+#[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
 pub enum TaskTriage {
     Low = 0,
@@ -38,11 +38,11 @@ pub enum TaskTriage {
 
 #[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
-#[strum(serialize_all = "lowercase")]
+#[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
 pub enum TaskStatus {
     Todo = 0,
-    InProg = 1,
+    InProgress = 1,
     Done = 2,
 }
 
