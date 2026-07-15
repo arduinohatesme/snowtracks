@@ -16,7 +16,7 @@ fn main() {
             setup(sub_matches).unwrap();
         }
         Some(("add", sub_matches)) => {
-            add(sub_matches);
+            add(sub_matches).unwrap();
         }
         _ => unreachable!(),
     }

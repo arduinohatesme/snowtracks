@@ -9,8 +9,9 @@ use std::{
     fs,
     io::{self, Write, stdout},
     str::FromStr,
+    time::SystemTime,
 };
-use strum::IntoEnumIterator;
+use strum::VariantNames;
 
 /// Adds a task to the database
 ///
@@ -56,8 +57,7 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     println!("[+] Read database");
     println!("[-] Generating task hash");
 
-    let short_hash = generate_short_hash(&db_str);
-    task.hash = Some(short_hash);
+    generate_short_hash(&db_str, &mut task);
 
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
@@ -84,18 +84,37 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
     println!("[+] Wrote new database");
-    println!("==> Added task \"{}\"", db_obj.tasks.last().unwrap().name);
+    println!(
+        "==> Added task \"{}\" with hash {} to database \"{}\"",
+        db_obj.tasks.last().unwrap().name,
+        db_obj
+            .tasks
+            .last()
+            .expect("Failed to get last task")
+            .hash
+            .as_ref()
+            .unwrap_or(&"not found".to_string()),
+        db_obj.name
+    );
 
     Ok(())
 }
 
-fn generate_short_hash(db_str: &str) -> String {
+fn generate_short_hash(db_str: &str, task: &mut Task) {
     let mut hasher = Sha1::new();
     hasher.update(&db_str.as_bytes());
     hasher.update(b"\0");
     hasher.update(
-        bincode_next::encode_to_vec(&db_str, config::standard())
+        bincode_next::serde::encode_to_vec(&task, config::standard())
             .expect("Failed to encode database"),
+    );
+    hasher.update(b"\0");
+    hasher.update(
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_micros()
+            .to_be_bytes(),
     );
 
     let full_hash = hasher
@@ -104,8 +123,7 @@ fn generate_short_hash(db_str: &str) -> String {
         .map(|b| format!("{:02x}", b))
         .collect::<String>();
 
-    let short_hash = full_hash[..7].to_string();
-    short_hash
+    task.hash = Some(full_hash[..6].to_string());
 }
 
 fn get_task_from_args(matches: &ArgMatches) -> Task {
@@ -121,37 +139,21 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
 fn get_status(matches: &ArgMatches) -> TaskStatus {
     match get_from_args(matches, "progress") {
         Some(arg) => TaskStatus::from_str(&arg).unwrap_or({
-            println!("Invalid task status.");
-            print!("Enter task status (todo): ");
-            stdout().flush().unwrap();
+            println!("Invalid task status");
+            let valid = TaskStatus::VARIANTS;
 
-            let mut buf = String::new();
-            let mut valid: Vec<String> = TaskStatus::iter().map(|t| t.to_string()).collect();
-            valid.push("".to_string());
+            let selection_int =
+                get_input_in("Enter task status", &valid).expect("Failed to get task status");
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task size level");
-
-            if buf == "" {
-                TaskStatus::Todo
-            } else {
-                TaskStatus::from_str(&buf.trim().to_uppercase()).unwrap()
-            }
+            TaskStatus::from_repr(selection_int).expect("Failed to convert selection to TaskStatus")
         }),
         None => {
-            print!("Enter task status: ");
-            stdout().flush().unwrap();
+            let valid = TaskStatus::VARIANTS;
 
-            let mut buf = String::new();
-            let mut valid: Vec<String> = TaskStatus::iter().map(|t| t.to_string()).collect();
-            valid.push("".to_string());
+            let selection_int =
+                get_input_in("Enter task status", &valid).expect("Failed to get task status");
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task status");
-
-            if buf == "" {
-                TaskStatus::Todo
-            } else {
-                TaskStatus::from_str(&buf.trim().to_lowercase()).unwrap()
-            }
+            TaskStatus::from_repr(selection_int).expect("Failed to convert selection to TaskStatus")
         }
     }
 }
@@ -159,27 +161,21 @@ fn get_status(matches: &ArgMatches) -> TaskStatus {
 fn get_size(matches: &ArgMatches) -> TaskSize {
     match get_from_args(matches, "size") {
         Some(arg) => TaskSize::from_str(&arg).unwrap_or({
-            println!("Invalid task size.");
-            print!("Enter task size: ");
-            stdout().flush().unwrap();
+            println!("Invalid task size");
+            let valid = TaskSize::VARIANTS;
 
-            let mut buf = String::new();
-            let valid: Vec<String> = TaskSize::iter().map(|t| t.to_string()).collect();
+            let selection_int =
+                get_input_in("Enter task size", &valid).expect("Failed to get task size");
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task size");
-            TaskSize::from_str(&buf.trim().to_lowercase()).unwrap()
+            TaskSize::from_repr(selection_int).expect("Failed to convert selection to TaskSize")
         }),
         None => {
-            print!("Enter task size: ");
-            stdout().flush().unwrap();
+            let valid = TaskSize::VARIANTS;
 
-            let mut buf = String::new();
-            let valid: Vec<String> = TaskSize::iter()
-                .map(|t| t.to_string().to_lowercase())
-                .collect();
+            let selection_int =
+                get_input_in("Enter task size", &valid).expect("Failed to get task size");
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task size");
-            TaskSize::from_str(&buf.trim().to_lowercase()).unwrap()
+            TaskSize::from_repr(selection_int).expect("Failed to convert selection to TaskSize")
         }
     }
 }
@@ -203,24 +199,22 @@ fn get_triage(matches: &ArgMatches) -> TaskTriage {
     match get_from_args(matches, "triage") {
         Some(arg) => TaskTriage::from_str(&arg).unwrap_or({
             println!("Invalid triage level.");
-            print!("Enter triage level: ");
             stdout().flush().unwrap();
 
-            let mut buf = String::new();
-            let valid: Vec<String> = TaskTriage::iter().map(|t| t.to_string()).collect();
+            let valid = TaskTriage::VARIANTS;
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task triage level");
-            TaskTriage::from_str(&buf).unwrap()
+            let selection_int = get_input_in("Enter triage level", &valid)
+                .expect("Failed to get task triage level");
+
+            TaskTriage::from_repr(selection_int).expect("Failed to convert selection to TaskTriage")
         }),
         None => {
-            print!("Enter triage level: ");
-            stdout().flush().unwrap();
+            let valid = TaskTriage::VARIANTS;
 
-            let mut buf = String::new();
-            let valid: Vec<String> = TaskTriage::iter().map(|t| t.to_string()).collect();
+            let selection_int = get_input_in("Enter triage level", &valid)
+                .expect("Failed to get task triage level");
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task triage level");
-            TaskTriage::from_str(&buf.trim().to_lowercase()).unwrap()
+            TaskTriage::from_repr(selection_int).expect("Failed to convert selection to TaskTriage")
         }
     }
 }

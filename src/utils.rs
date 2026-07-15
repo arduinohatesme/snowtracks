@@ -1,11 +1,9 @@
 use clap::ArgMatches;
+use dialoguer::{Confirm, Select};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::{
-    env,
-    io::{self, Write},
-};
-use strum::{Display, EnumIter, EnumString, FromRepr};
+use std::env;
+use strum::{Display, EnumString, FromRepr, VariantNames};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -13,7 +11,7 @@ pub struct Config {
     pub databases: Vec<String>,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -27,7 +25,7 @@ pub enum TaskSize {
     XXL = 7,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -38,7 +36,7 @@ pub enum TaskTriage {
     Urgent = 3,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -65,26 +63,27 @@ pub struct TasksDatabase {
     pub tasks: Vec<Task>,
 }
 
-pub fn get_input_in(possible: &[String], buf: &mut String) -> io::Result<()> {
-    let mut ran_before = false;
-    loop {
-        if ran_before {
-            print!("\x1b[An\r\x1b[2K");
-            print!("Invalid input. Try again: ");
-            io::stdout().flush()?;
-        }
-        buf.clear();
-        io::stdin().read_line(buf)?;
+pub fn get_confirmation(prompt: &str) -> Option<bool> {
+    Confirm::new()
+        .with_prompt(prompt)
+        .interact_opt()
+        .expect("Failed to get confirmation")
+}
 
-        let clean_buf = buf.trim().to_lowercase();
-        ran_before = true;
-
-        if possible.contains(&clean_buf) {
-            *buf = clean_buf;
-            break;
-        }
+pub fn get_input_in(prompt: &str, possible: &[&str]) -> Option<i32> {
+    if possible.is_empty() {
+        return None;
     }
-    Ok(())
+
+    let labels: Vec<String> = possible.iter().map(|item| item.to_string()).collect();
+    let selection = Select::new()
+        .with_prompt(prompt)
+        .items(&labels)
+        .default(0)
+        .interact_opt()
+        .ok()?;
+
+    selection.map(|idx| idx as i32)
 }
 
 /// Gets a string from arguments, defaulting to an empty String.

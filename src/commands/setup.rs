@@ -1,6 +1,7 @@
-use crate::utils::{Config, TasksDatabase, get_config_path, get_from_args, get_input_in};
+use crate::utils::{Config, TasksDatabase, get_config_path, get_confirmation, get_from_args};
 use clap::ArgMatches;
 use std::env;
+use std::io::stdout;
 use std::{
     fs::{self, create_dir, exists},
     io::{self, Write},
@@ -190,18 +191,15 @@ fn validate_tasks_file(file_path: &str) -> io::Result<()> {
 ///
 /// * `db_path` - The path to the database in question
 fn prompt_remove_database_from_config(db_path: &str) -> io::Result<()> {
-    print!("Do you want to remove {} from your config? (Y/n) ", db_path);
-    io::stdout().flush()?;
+    stdout().flush()?;
+    let prompt = format!("Do you want to remove {} from your config?", db_path);
+    let delete = get_confirmation(&prompt).unwrap();
 
-    let mut buf = "".to_string();
-    get_input_in(
-        &["y".to_string(), "n".to_string(), "".to_string()],
-        &mut buf,
-    )
-    .unwrap();
-    buf = buf.trim().to_lowercase();
+    for _ in 0..2 {
+        print!("\x1b[An\r\x1b[2K");
+    }
 
-    if buf == "n" {
+    if !delete {
         return Ok(());
     }
 
