@@ -57,18 +57,118 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
 
     println!("==> Setting up database \"{}\" ({})", db_name, db_dir);
 
-    if !exists(&db_dir).unwrap() {
+    ensure_database_file(db_name, &db_dir)?;
+
+    let cfg_dir = match env::var("XDG_CONFIG_HOME") {
+        Ok(path) => format!("{}/snowtracks", path),
+        Err(_) => "./snowtracks-cfg".to_string(),
+    };
+
+    ensure_config_file(&db_dir, &cfg_path, cfg_dir)?;
+
+    let cfg_str = fs::read_to_string(&cfg_path)?;
+    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
+
+    ensure_database_in_config(db_dir, cfg_path, &mut cfg_obj)?;
+
+    println!("[-] Validating config");
+
+    validate_databases(cfg_obj)?;
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Validated config");
+    println!("==> Finished setup!");
+
+    Ok(())
+}
+
+fn validate_databases(cfg_obj: Config) -> Result<(), io::Error> {
+    Ok(for db in &cfg_obj.databases {
+        let tasks_path = format!("{}/tasks.json", db);
+        match validate_tasks_file(&tasks_path) {
+            Ok(_) => {}
+            Err(e) => {
+                println!("Failed to read database file {}: {}", tasks_path, e);
+                prompt_remove_database_from_config(&db.trim())?;
+            }
+        }
+    })
+}
+
+fn ensure_database_in_config(
+    db_dir: String,
+    cfg_path: String,
+    cfg_obj: &mut Config,
+) -> Result<(), io::Error> {
+    Ok(if !cfg_obj.databases.contains(&db_dir) {
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[-] Adding database to existing config ({})", &cfg_path);
+
+        cfg_obj.databases.push(db_dir);
+        fs::write(
+            &cfg_path,
+            toml::to_string_pretty(&*cfg_obj).expect("Failed to parse new Config struct"),
+        )
+        .expect("Failed to write new config");
+
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] New database added to config ({})", &cfg_path);
+    } else {
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Database already in config ({})", &db_dir);
+    })
+}
+
+fn ensure_config_file(
+    db_dir: &String,
+    cfg_path: &String,
+    cfg_dir: String,
+) -> Result<(), io::Error> {
+    if !exists(&cfg_dir).unwrap() {
+        println!("[-] Creating configuration directory");
+        create_dir(&cfg_dir).unwrap();
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Created configuration directory");
+    } else {
+        println!("[+] Configuration directory already exists");
+    }
+    Ok(if !exists(cfg_path).unwrap() {
+        println!("[-] Generating base config");
+
+        let cfg_obj: Config = Config {
+            databases: vec![db_dir.clone()],
+        };
+
+        fs::write(
+            cfg_path,
+            toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct"),
+        )
+        .expect("Failed to write config");
+
+        print!("\x1b[An\r\x1b[2K");
+        std::io::stdout().flush()?;
+        println!("[+] Base config generated");
+        return Ok(());
+    })
+}
+
+fn ensure_database_file(db_name: String, db_dir: &String) -> Result<(), io::Error> {
+    if !exists(db_dir).unwrap() {
         println!("[-] Creating database directory");
-        create_dir(&db_dir).unwrap();
+        create_dir(db_dir).unwrap();
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
         println!("[+] Created database directory");
     } else {
         println!("[+] Database directory already exists");
     }
-
-    let db_task_file = format!("{}/tasks.json", &db_dir);
-    if !exists(&db_task_file)? {
+    let db_task_file = format!("{}/tasks.json", db_dir);
+    Ok(if !exists(&db_task_file)? {
         println!("[-] Creating database task file");
 
         let base_db = TasksDatabase {
@@ -86,84 +186,7 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Created database task file");
     } else {
         println!("[+] Database task file already exists");
-    }
-
-    let cfg_dir = match env::var("XDG_CONFIG_HOME") {
-        Ok(path) => format!("{}/snowtracks", path),
-        Err(_) => "./snowtracks-cfg".to_string(),
-    };
-
-    if !exists(&cfg_dir).unwrap() {
-        println!("[-] Creating configuration directory");
-        create_dir(&cfg_dir).unwrap();
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] Created configuration directory");
-    } else {
-        println!("[+] Configuration directory already exists");
-    }
-
-    if !exists(&cfg_path).unwrap() {
-        println!("[-] Generating base config");
-        let cfg_obj: Config = Config {
-            databases: vec![db_dir.clone()],
-        };
-
-        fs::write(
-            &cfg_path,
-            toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct"),
-        )
-        .expect("Failed to write config");
-
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] Base config generated");
-        return Ok(());
-    }
-
-    let cfg_str = fs::read_to_string(&cfg_path)?;
-    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
-
-    if !cfg_obj.databases.contains(&db_dir) {
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[-] Adding database to existing config ({})", &cfg_path);
-
-        cfg_obj.databases.push(db_dir);
-        fs::write(
-            &cfg_path,
-            toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
-        )
-        .expect("Failed to write new config");
-
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] New database added to config ({})", &cfg_path);
-    } else {
-        print!("\x1b[An\r\x1b[2K");
-        std::io::stdout().flush()?;
-        println!("[+] Database already in config ({})", &db_dir);
-    }
-
-    println!("[-] Validating config");
-
-    for db in &cfg_obj.databases {
-        let tasks_path = format!("{}/tasks.json", db);
-        match validate_tasks_file(&tasks_path) {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Failed to read database file {}: {}", tasks_path, e);
-                prompt_remove_database_from_config(&db.trim())?;
-            }
-        }
-    }
-
-    print!("\x1b[An\r\x1b[2K");
-    std::io::stdout().flush()?;
-    println!("[+] Validated config");
-    println!("==> Finished setup!");
-
-    Ok(())
+    })
 }
 
 /// Validates database tasks
