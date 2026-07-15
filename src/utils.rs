@@ -1,8 +1,10 @@
+use bincode_next::config;
 use clap::ArgMatches;
 use dialoguer::{Confirm, Select};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::env;
+use sha1::{Digest, Sha1};
+use std::{env, time::SystemTime};
 use strum::{Display, EnumString, FromRepr, VariantNames};
 
 #[derive(Serialize, Deserialize)]
@@ -118,4 +120,30 @@ pub fn get_config_path() -> String {
         "{}/snowtracks/snowtracks.toml",
         env::var("XDG_CONFIG_HOME").expect("Failed to read config var")
     )
+}
+
+pub fn add_hash_to_task(db_str: &str, task: &mut Task) {
+    let mut hasher = Sha1::new();
+    hasher.update(&db_str.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(
+        bincode_next::serde::encode_to_vec(&task, config::standard())
+            .expect("Failed to encode database"),
+    );
+    hasher.update(b"\0");
+    hasher.update(
+        SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Failed to get system time")
+            .as_micros()
+            .to_be_bytes(),
+    );
+
+    let hash = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+
+    task.hash = Some(hash);
 }

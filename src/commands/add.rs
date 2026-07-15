@@ -1,15 +1,12 @@
 use crate::utils::{
-    Config, Task, TaskSize, TaskStatus, TaskTriage, TasksDatabase, get_config_path, get_from_args,
-    get_input_in,
+    Config, Task, TaskSize, TaskStatus, TaskTriage, TasksDatabase, add_hash_to_task,
+    get_config_path, get_from_args, get_input_in,
 };
-use bincode_next::{self, config};
 use clap::ArgMatches;
-use sha1::{Digest, Sha1};
 use std::{
     fs,
     io::{self, Write, stdout},
     str::FromStr,
-    time::SystemTime,
 };
 use strum::VariantNames;
 
@@ -57,7 +54,7 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     println!("[+] Read database");
     println!("[-] Generating task hash");
 
-    generate_short_hash(&db_str, &mut task);
+    add_hash_to_task(&db_str, &mut task);
 
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
@@ -98,32 +95,6 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     );
 
     Ok(())
-}
-
-fn generate_short_hash(db_str: &str, task: &mut Task) {
-    let mut hasher = Sha1::new();
-    hasher.update(&db_str.as_bytes());
-    hasher.update(b"\0");
-    hasher.update(
-        bincode_next::serde::encode_to_vec(&task, config::standard())
-            .expect("Failed to encode database"),
-    );
-    hasher.update(b"\0");
-    hasher.update(
-        SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .expect("Failed to get system time")
-            .as_micros()
-            .to_be_bytes(),
-    );
-
-    let full_hash = hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<String>();
-
-    task.hash = Some(full_hash[..6].to_string());
 }
 
 fn get_task_from_args(matches: &ArgMatches) -> Task {
