@@ -1,9 +1,12 @@
 use crate::utils::{
-    Task, TaskSize, TaskStatus, TaskTriage, get_config_path, get_from_args, get_input_in,
+    Config, Task, TaskSize, TaskStatus, TaskTriage, TasksDatabase, get_config_path, get_from_args,
+    get_input_in,
 };
+use bincode_next::{self, config};
 use clap::ArgMatches;
+use sha1::{Digest, Sha1};
 use std::{
-    fs::read_to_string,
+    fs,
     io::{self, Write, stdout},
     str::FromStr,
 };
@@ -28,10 +31,81 @@ use strum::IntoEnumIterator;
 ///     panic!("Error: Add subcommand not triggered.");
 /// }
 /// ```
-pub fn add(matches: &ArgMatches) {
-    let task = get_task_from_args(matches);
-    read_to_string(get_config_path()).unwrap();
-    println!("Made task: {:#?}", task);
+pub fn add(matches: &ArgMatches) -> io::Result<()> {
+    let mut task = get_task_from_args(matches);
+
+    println!("==> Adding task \"{}\"", task.name);
+    println!("[-] Reading configuration");
+    let cfg_str = fs::read_to_string(get_config_path()).unwrap();
+    let cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to read config");
+    let db_dir = cfg_obj.databases[0].to_string();
+    let db_path = format!("{}/tasks.json", db_dir);
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Read configuration");
+    println!("[i] Adding to database at {}", db_path);
+    println!("[-] Reading database");
+
+    let db_str = fs::read_to_string(&db_path).expect("Failed to read database");
+    let mut db_obj: TasksDatabase =
+        serde_json::from_str(&db_str).expect("Failed to cast database to TasksDatabase type");
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Read database");
+    println!("[-] Generating task hash");
+
+    let short_hash = generate_short_hash(&db_str);
+    task.hash = Some(short_hash);
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Generated task hash");
+    println!(
+        "[i] Task hash is {}",
+        task.hash.as_deref().unwrap_or("not found")
+    );
+    println!("[-] Adding task to database");
+
+    db_obj.tasks.push(task);
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Added task to database");
+    println!("[-] Writing new database");
+
+    fs::write(
+        &db_path,
+        serde_json::to_string(&db_obj).expect("Failed to serialize string"),
+    )
+    .expect("Failed to write database");
+
+    print!("\x1b[An\r\x1b[2K");
+    std::io::stdout().flush()?;
+    println!("[+] Wrote new database");
+    println!("==> Added task \"{}\"", db_obj.tasks.last().unwrap().name);
+
+    Ok(())
+}
+
+fn generate_short_hash(db_str: &str) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(&db_str.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(
+        bincode_next::encode_to_vec(&db_str, config::standard())
+            .expect("Failed to encode database"),
+    );
+
+    let full_hash = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+
+    let short_hash = full_hash[..7].to_string();
+    short_hash
 }
 
 fn get_task_from_args(matches: &ArgMatches) -> Task {
@@ -40,6 +114,7 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
         triage: get_triage(matches),
         status: get_status(matches),
         size: get_size(matches),
+        hash: None,
     }
 }
 
@@ -63,14 +138,14 @@ fn get_status(matches: &ArgMatches) -> TaskStatus {
             }
         }),
         None => {
-            print!("Enter task size: ");
+            print!("Enter task status: ");
             stdout().flush().unwrap();
 
             let mut buf = String::new();
             let mut valid: Vec<String> = TaskStatus::iter().map(|t| t.to_string()).collect();
             valid.push("".to_string());
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task size");
+            get_input_in(&valid, &mut buf).expect("Failed to get task status");
 
             if buf == "" {
                 TaskStatus::Todo
@@ -91,7 +166,7 @@ fn get_size(matches: &ArgMatches) -> TaskSize {
             let mut buf = String::new();
             let valid: Vec<String> = TaskSize::iter().map(|t| t.to_string()).collect();
 
-            get_input_in(&valid, &mut buf).expect("Failed to get task size level");
+            get_input_in(&valid, &mut buf).expect("Failed to get task size");
             TaskSize::from_str(&buf.trim().to_lowercase()).unwrap()
         }),
         None => {

@@ -1,5 +1,6 @@
 use clap::ArgMatches;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{
     env,
     io::{self, Write},
@@ -12,7 +13,7 @@ pub struct Config {
     pub databases: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -26,7 +27,7 @@ pub enum TaskSize {
     XXL = 7,
 }
 
-#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -37,7 +38,7 @@ pub enum TaskTriage {
     Urgent = 3,
 }
 
-#[derive(Serialize, Deserialize, EnumString, FromRepr, EnumIter, Display, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, EnumIter, Display, Debug)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "lowercase")]
 #[repr(i32)]
@@ -54,6 +55,7 @@ pub struct Task {
     pub triage: TaskTriage,
     pub status: TaskStatus,
     pub size: TaskSize,
+    pub hash: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -82,9 +84,6 @@ pub fn get_input_in(possible: &[String], buf: &mut String) -> io::Result<()> {
             break;
         }
     }
-
-    print!("\x1b[An\r\x1b[2K");
-    print!("\x1b[An\r\x1b[2K");
     Ok(())
 }
 
