@@ -7,68 +7,6 @@ use std::{
 };
 use users::get_current_username;
 
-/// Validates database tasks
-/// Returns Err if invalid
-///
-/// # Invalid Cases
-/// * File does not exist
-/// * File is not valid JSON
-/// * File JSON cannot be casted to TasksDatabase
-///
-/// # Arguments
-///
-/// * `file_path` - File path to check
-fn validate_tasks_file(file_path: &str) -> io::Result<()> {
-    let db_contents_str = fs::read_to_string(&file_path)?;
-    let _db_contents: TasksDatabase = serde_json::from_str(&db_contents_str)?;
-
-    Ok(())
-}
-
-/// Removes a database from the user's config.
-///
-/// # Arguments
-///
-/// * `db_path` - The path to the database to remove
-fn remove_database_from_config(db_path: &str) -> io::Result<()> {
-    let cfg_str = fs::read_to_string(get_config_path())?;
-    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
-
-    cfg_obj.databases.retain(|d| d != db_path);
-    fs::write(
-        get_config_path(),
-        toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
-    )
-    .expect("Failed to write new config");
-    Ok(())
-}
-
-/// Prompts the user if they want to remove a database
-/// from their config, and does so if they do.
-///
-/// # Arguments
-///
-/// * `db_path` - The path to the database in question
-fn prompt_remove_database_from_config(db_path: &str) -> io::Result<()> {
-    print!("Do you want to remove {} from your config? (Y/n) ", db_path);
-    io::stdout().flush()?;
-
-    let mut buf = "".to_string();
-    get_input_in(
-        &["y".to_string(), "n".to_string(), "".to_string()],
-        &mut buf,
-    )
-    .unwrap();
-    buf = buf.trim().to_lowercase();
-
-    if buf == "n" {
-        return Ok(());
-    }
-
-    remove_database_from_config(db_path)?;
-    Ok(())
-}
-
 /// Sets up database for task tracking
 /// Name defaults to <username>_db
 /// Path defaults to $XDG_DATA_HOME
@@ -224,5 +162,67 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
     println!("[+] Validated config");
     println!("==> Finished setup!");
 
+    Ok(())
+}
+
+/// Validates database tasks
+/// Returns Err if invalid
+///
+/// # Invalid Cases
+/// * File does not exist
+/// * File is not valid JSON
+/// * File JSON cannot be casted to TasksDatabase
+///
+/// # Arguments
+///
+/// * `file_path` - File path to check
+fn validate_tasks_file(file_path: &str) -> io::Result<()> {
+    let db_contents_str = fs::read_to_string(&file_path)?;
+    let _db_contents: TasksDatabase = serde_json::from_str(&db_contents_str)?;
+
+    Ok(())
+}
+
+/// Prompts the user if they want to remove a database
+/// from their config, and does so if they do.
+///
+/// # Arguments
+///
+/// * `db_path` - The path to the database in question
+fn prompt_remove_database_from_config(db_path: &str) -> io::Result<()> {
+    print!("Do you want to remove {} from your config? (Y/n) ", db_path);
+    io::stdout().flush()?;
+
+    let mut buf = "".to_string();
+    get_input_in(
+        &["y".to_string(), "n".to_string(), "".to_string()],
+        &mut buf,
+    )
+    .unwrap();
+    buf = buf.trim().to_lowercase();
+
+    if buf == "n" {
+        return Ok(());
+    }
+
+    remove_database_from_config(db_path)?;
+    Ok(())
+}
+
+/// Removes a database from the user's config.
+///
+/// # Arguments
+///
+/// * `db_path` - The path to the database to remove
+fn remove_database_from_config(db_path: &str) -> io::Result<()> {
+    let cfg_str = fs::read_to_string(get_config_path())?;
+    let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
+
+    cfg_obj.databases.retain(|d| d != db_path);
+    fs::write(
+        get_config_path(),
+        toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
+    )
+    .expect("Failed to write new config");
     Ok(())
 }
