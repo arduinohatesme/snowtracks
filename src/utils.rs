@@ -9,7 +9,7 @@ use strum::{Display, EnumString, FromRepr, VariantNames};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Config {
+pub(crate) struct Config {
     pub databases: Vec<String>,
 }
 
@@ -17,7 +17,7 @@ pub struct Config {
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 #[repr(i32)]
-pub enum TaskSize {
+pub(crate) enum TaskSize {
     XXS = 0,
     XS = 1,
     S = 3,
@@ -31,7 +31,7 @@ pub enum TaskSize {
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
-pub enum TaskTriage {
+pub(crate) enum TaskTriage {
     Low = 0,
     Medium = 1,
     High = 2,
@@ -42,7 +42,7 @@ pub enum TaskTriage {
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
-pub enum TaskStatus {
+pub(crate) enum TaskStatus {
     Todo = 0,
     InProgress = 1,
     Done = 2,
@@ -50,7 +50,7 @@ pub enum TaskStatus {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct Task {
+pub(crate) struct Task {
     pub name: String,
     pub triage: TaskTriage,
     pub status: TaskStatus,
@@ -60,19 +60,19 @@ pub struct Task {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TasksDatabase {
+pub(crate) struct TasksDatabase {
     pub name: String,
     pub tasks: Vec<Task>,
 }
 
-pub fn get_confirmation(prompt: &str) -> Option<bool> {
+pub(crate) fn get_confirmation(prompt: &str) -> Option<bool> {
     Confirm::new()
         .with_prompt(prompt)
         .interact_opt()
         .expect("Failed to get confirmation")
 }
 
-pub fn get_input_in(prompt: &str, possible: &[&str]) -> Option<i32> {
+pub(crate) fn get_input_in(prompt: &str, possible: &[&str]) -> Option<i32> {
     if possible.is_empty() {
         return None;
     }
@@ -110,19 +110,18 @@ pub fn get_input_in(prompt: &str, possible: &[&str]) -> Option<i32> {
 /// let arg = get_from_args(&matches, "NAME");
 /// assert_eq!(arg, "John Smith".to_string());
 /// ```
-#[doc(hidden)]
-pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> Option<String> {
+pub(crate) fn get_from_args(matches: &ArgMatches, tgt: &str) -> Option<String> {
     return matches.get_one::<String>(tgt).map(|s| s.to_string());
 }
 
-pub fn get_config_path() -> String {
+pub(crate) fn get_config_path() -> String {
     format!(
         "{}/snowtracks/snowtracks.toml",
         env::var("XDG_CONFIG_HOME").expect("Failed to read config var")
     )
 }
 
-pub fn add_hash_to_task(db_str: &str, task: &mut Task) {
+pub(crate) fn add_hash_to_task(db_str: &str, task: &mut Task) {
     let mut hasher = Sha1::new();
     hasher.update(&db_str.as_bytes());
     hasher.update(b"\0");
