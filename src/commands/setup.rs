@@ -1,14 +1,12 @@
-use crate::utils::{Config, TasksDatabase, get_from_args, get_input_in};
+use crate::utils::{Config, TasksDatabase, get_config_path, get_from_args, get_input_in};
 use clap::ArgMatches;
 use std::env;
-use std::sync::OnceLock;
 use std::{
     fs::{self, create_dir, exists},
     io::{self, Write},
 };
 use users::get_current_username;
 
-static CONFIG_FILE_PATH: OnceLock<String> = OnceLock::new();
 /// Validates database tasks
 /// Returns Err if invalid
 ///
@@ -33,12 +31,12 @@ fn validate_tasks_file(file_path: &str) -> io::Result<()> {
 ///
 /// * `db_path` - The path to the database to remove
 fn remove_database_from_config(db_path: &str) -> io::Result<()> {
-    let cfg_str = fs::read_to_string(CONFIG_FILE_PATH.get().unwrap())?;
+    let cfg_str = fs::read_to_string(get_config_path())?;
     let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
 
     cfg_obj.databases.retain(|d| d != db_path);
     fs::write(
-        CONFIG_FILE_PATH.get().unwrap(),
+        get_config_path(),
         toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
     )
     .expect("Failed to write new config");
@@ -116,6 +114,8 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         ),
     };
 
+    let cfg_path = get_config_path();
+
     println!("==> Setting up database \"{}\" ({})", db_name, db_dir);
 
     if !exists(&db_dir).unwrap() {
@@ -154,12 +154,6 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         Err(_) => "./snowtracks-cfg".to_string(),
     };
 
-    if CONFIG_FILE_PATH.get().is_none() {
-        CONFIG_FILE_PATH
-            .set(format!("{}/snowtracks.toml", cfg_dir))
-            .expect("Failed to set config file path");
-    }
-
     if !exists(&cfg_dir).unwrap() {
         println!("[-] Creating configuration directory");
         create_dir(&cfg_dir).unwrap();
@@ -170,14 +164,14 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         println!("[+] Configuration directory already exists");
     }
 
-    if !exists(CONFIG_FILE_PATH.get().unwrap()).unwrap() {
+    if !exists(&cfg_path).unwrap() {
         println!("[-] Generating base config");
         let cfg_obj: Config = Config {
             databases: vec![db_dir.clone()],
         };
 
         fs::write(
-            CONFIG_FILE_PATH.get().unwrap(),
+            &cfg_path,
             toml::to_string_pretty(&cfg_obj).expect("Failed to parse Config struct"),
         )
         .expect("Failed to write config");
@@ -188,30 +182,24 @@ pub fn setup(matches: &ArgMatches) -> io::Result<()> {
         return Ok(());
     }
 
-    let cfg_str = fs::read_to_string(CONFIG_FILE_PATH.get().unwrap())?;
+    let cfg_str = fs::read_to_string(&cfg_path)?;
     let mut cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to parse config file");
 
     if !cfg_obj.databases.contains(&db_dir) {
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
-        println!(
-            "[-] Adding database to existing config ({})",
-            CONFIG_FILE_PATH.get().unwrap()
-        );
+        println!("[-] Adding database to existing config ({})", &cfg_path);
 
         cfg_obj.databases.push(db_dir);
         fs::write(
-            CONFIG_FILE_PATH.get().unwrap(),
+            &cfg_path,
             toml::to_string_pretty(&cfg_obj).expect("Failed to parse new Config struct"),
         )
         .expect("Failed to write new config");
 
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;
-        println!(
-            "[+] New database added to config ({})",
-            CONFIG_FILE_PATH.get().unwrap()
-        );
+        println!("[+] New database added to config ({})", &cfg_path);
     } else {
         print!("\x1b[An\r\x1b[2K");
         std::io::stdout().flush()?;

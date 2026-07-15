@@ -87,6 +87,7 @@ pub fn cli() -> Command {
                 .about("Add a task to a tracker")
                 .arg(arg!(-n --name [NAME] "The name of the task"))
                 .arg(arg!(-t --triage [TRIAGE] "The triage level of the task"))
+                .arg(arg!(-s --size [SIZE] "The size of the task"))
                 .arg(arg!(-p --progress [PROGRESS] "The progress level of the task")),
         )
         .subcommand(

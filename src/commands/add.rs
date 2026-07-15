@@ -1,6 +1,9 @@
-use crate::utils::{Task, TaskSize, TaskStatus, TaskTriage, get_from_args, get_input_in};
+use crate::utils::{
+    Task, TaskSize, TaskStatus, TaskTriage, get_config_path, get_from_args, get_input_in,
+};
 use clap::ArgMatches;
 use std::{
+    fs::read_to_string,
     io::{self, Write, stdout},
     str::FromStr,
 };
@@ -10,7 +13,8 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
     let task_name: String = match get_from_args(matches, "name") {
         Some(arg) => arg,
         None => {
-            println!("Enter task name: ");
+            print!("Enter task name: ");
+            stdout().flush().unwrap();
             let mut buf = String::new();
             io::stdin()
                 .read_line(&mut buf)
@@ -39,11 +43,11 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
             let valid: Vec<String> = TaskTriage::iter().map(|t| t.to_string()).collect();
 
             get_input_in(&valid, &mut buf).expect("Failed to get task triage level");
-            TaskTriage::from_str(&buf).unwrap()
+            TaskTriage::from_str(&buf.trim().to_lowercase()).unwrap()
         }
     };
 
-    let task_size: TaskSize = match get_from_args(matches, "triage") {
+    let task_size: TaskSize = match get_from_args(matches, "size") {
         Some(arg) => TaskSize::from_str(&arg).unwrap_or({
             println!("Invalid task size.");
             print!("Enter task size: ");
@@ -53,24 +57,27 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
             let valid: Vec<String> = TaskSize::iter().map(|t| t.to_string()).collect();
 
             get_input_in(&valid, &mut buf).expect("Failed to get task size level");
-            TaskSize::from_str(&buf).unwrap()
+            TaskSize::from_str(&buf.trim().to_lowercase()).unwrap()
         }),
         None => {
             print!("Enter task size: ");
             stdout().flush().unwrap();
 
             let mut buf = String::new();
-            let valid: Vec<String> = TaskSize::iter().map(|t| t.to_string()).collect();
+            let valid: Vec<String> = TaskSize::iter()
+                .map(|t| t.to_string().to_lowercase())
+                .collect();
 
             get_input_in(&valid, &mut buf).expect("Failed to get task size");
-            TaskSize::from_str(&buf).unwrap()
+            TaskSize::from_str(&buf.trim().to_lowercase()).unwrap()
         }
     };
 
-    let task_status: TaskStatus = match get_from_args(matches, "triage") {
+    let task_status: TaskStatus = match get_from_args(matches, "progress") {
         Some(arg) => TaskStatus::from_str(&arg).unwrap_or({
             println!("Invalid task status.");
-            println!("Enter task status (todo): ");
+            print!("Enter task status (todo): ");
+            stdout().flush().unwrap();
 
             let mut buf = String::new();
             let mut valid: Vec<String> = TaskStatus::iter().map(|t| t.to_string()).collect();
@@ -81,7 +88,7 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
             if buf == "" {
                 TaskStatus::Todo
             } else {
-                TaskStatus::from_str(&buf).unwrap()
+                TaskStatus::from_str(&buf.trim().to_uppercase()).unwrap()
             }
         }),
         None => {
@@ -97,7 +104,7 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
             if buf == "" {
                 TaskStatus::Todo
             } else {
-                TaskStatus::from_str(&buf).unwrap()
+                TaskStatus::from_str(&buf.trim().to_lowercase()).unwrap()
             }
         }
     };
@@ -131,5 +138,6 @@ fn get_task_from_args(matches: &ArgMatches) -> Task {
 /// ```
 pub fn add(matches: &ArgMatches) {
     let task = get_task_from_args(matches);
+    read_to_string(get_config_path()).unwrap();
     println!("Made task: {:#?}", task);
 }

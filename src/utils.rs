@@ -1,6 +1,9 @@
 use clap::ArgMatches;
 use serde::{Deserialize, Serialize};
-use std::io::{self, Write};
+use std::{
+    env,
+    io::{self, Write},
+};
 use strum::{Display, EnumIter, EnumString, FromRepr};
 
 #[derive(Serialize, Deserialize)]
@@ -75,6 +78,7 @@ pub fn get_input_in(possible: &[String], buf: &mut String) -> io::Result<()> {
         ran_before = true;
 
         if possible.contains(&clean_buf) {
+            *buf = clean_buf;
             break;
         }
     }
@@ -109,4 +113,11 @@ pub fn get_input_in(possible: &[String], buf: &mut String) -> io::Result<()> {
 #[doc(hidden)]
 pub fn get_from_args(matches: &ArgMatches, tgt: &str) -> Option<String> {
     return matches.get_one::<String>(tgt).map(|s| s.to_string());
+}
+
+pub fn get_config_path() -> String {
+    format!(
+        "{}/snowtracks/snowtracks.toml",
+        env::var("XDG_CONFIG_HOME").expect("Failed to read config var")
+    )
 }
