@@ -13,7 +13,9 @@ pub(crate) struct Config {
     pub primary_database: String,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
+#[derive(
+    Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug, Clone,
+)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 #[repr(i32)]
@@ -27,7 +29,9 @@ pub(crate) enum TaskSize {
     XXL = 7,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
+#[derive(
+    Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug, Clone,
+)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
@@ -38,7 +42,9 @@ pub(crate) enum TaskTriage {
     Urgent = 3,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
+#[derive(
+    Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug, Clone,
+)]
 #[serde(rename_all = "camelCase")]
 #[strum(serialize_all = "PascalCase")]
 #[repr(i32)]
@@ -48,7 +54,7 @@ pub(crate) enum TaskStatus {
     Done = 2,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Task {
     pub name: String,
@@ -58,7 +64,7 @@ pub(crate) struct Task {
     pub hash: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TasksDatabase {
     pub name: String,
