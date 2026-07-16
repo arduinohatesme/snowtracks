@@ -79,8 +79,7 @@ pub fn cli() -> Command {
         .subcommand(
             Command::new("setup")
                 .about("Setup a snowtracks database")
-                .arg(arg!(-n --name [NAME] "The name of the database"))
-                .arg(arg!(-p --path [PATH] "The destination path of the database")),
+                .arg(arg!(-n --name [NAME] "The name of the database")),
         )
         .subcommand(
             Command::new("add")
@@ -93,6 +92,6 @@ pub fn cli() -> Command {
         .subcommand(
             Command::new("delete")
                 .about("Remove a task from the tracker")
-                .arg(arg!(<ID> "The ID number of the task")),
+                .arg(arg!(<HASH> "The hash of the task")),
         )
 }

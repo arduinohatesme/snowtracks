@@ -4,13 +4,13 @@ use dialoguer::{Confirm, Select};
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use sha1::{Digest, Sha1};
-use std::{env, time::SystemTime};
+use std::{env, fs, time::SystemTime};
 use strum::{Display, EnumString, FromRepr, VariantNames};
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Config {
-    pub databases: Vec<String>,
+    pub primary_database: String,
 }
 
 #[derive(Serialize_repr, Deserialize_repr, EnumString, FromRepr, VariantNames, Display, Debug)]
@@ -121,6 +121,14 @@ pub(crate) fn get_config_path() -> String {
     )
 }
 
+pub(crate) fn get_database_path(name: Option<&str>) -> String {
+    let data_dir = env::var("XDG_DATA_HOME").expect("Failed to read XDG_DATA_HOME");
+    match name {
+        Some(n) => format!("{}/snowtracks/databases/{}", data_dir, n),
+        None => format!("{}/snowtracks/databases", data_dir),
+    }
+}
+
 pub(crate) fn add_hash_to_task(db_str: &str, task: &mut Task) {
     let mut hasher = Sha1::new();
     hasher.update(&db_str.as_bytes());
@@ -145,4 +153,10 @@ pub(crate) fn add_hash_to_task(db_str: &str, task: &mut Task) {
         .collect::<String>();
 
     task.hash = Some(hash);
+}
+
+pub(crate) fn get_database_object(db_file: &str) -> TasksDatabase {
+    let db_str = fs::read_to_string(&db_file).expect("Failed to read database file");
+    let db_obj: TasksDatabase = serde_json::from_str(&db_str).expect("Failed to parse database");
+    db_obj
 }

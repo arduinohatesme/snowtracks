@@ -1,6 +1,6 @@
 use crate::utils::{
     Config, Task, TaskSize, TaskStatus, TaskTriage, TasksDatabase, add_hash_to_task,
-    get_config_path, get_from_args, get_input_in,
+    get_config_path, get_database_object, get_database_path, get_from_args, get_input_in,
 };
 use clap::ArgMatches;
 use std::{
@@ -30,13 +30,13 @@ use strum::VariantNames;
 /// }
 /// ```
 pub fn add(matches: &ArgMatches) -> io::Result<()> {
-    let mut task = get_task_from_args(matches);
+    let mut task = get_new_task_from_args(matches);
 
     println!("==> Adding task \"{}\"", task.name);
     println!("[-] Reading configuration");
     let cfg_str = fs::read_to_string(get_config_path()).unwrap();
     let cfg_obj: Config = toml::from_str(&cfg_str).expect("Failed to read config");
-    let db_dir = cfg_obj.databases[0].to_string();
+    let db_dir = get_database_path(Some(&cfg_obj.primary_database));
     let db_path = format!("{}/tasks.json", db_dir);
 
     print!("\x1b[An\r\x1b[2K");
@@ -45,16 +45,17 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     println!("[i] Adding to database at {}", db_path);
     println!("[-] Reading database");
 
-    let db_str = fs::read_to_string(&db_path).expect("Failed to read database");
-    let mut db_obj: TasksDatabase =
-        serde_json::from_str(&db_str).expect("Failed to cast database to TasksDatabase type");
+    let mut db_obj = get_database_object(&db_path);
 
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
     println!("[+] Read database");
     println!("[-] Generating task hash");
 
-    add_hash_to_task(&db_str, &mut task);
+    add_hash_to_task(
+        &serde_json::to_string(&db_obj).expect("Failed to serialize database"),
+        &mut task,
+    );
 
     print!("\x1b[An\r\x1b[2K");
     std::io::stdout().flush()?;
@@ -97,7 +98,7 @@ pub fn add(matches: &ArgMatches) -> io::Result<()> {
     Ok(())
 }
 
-fn get_task_from_args(matches: &ArgMatches) -> Task {
+fn get_new_task_from_args(matches: &ArgMatches) -> Task {
     Task {
         name: get_name(matches),
         triage: get_triage(matches),
