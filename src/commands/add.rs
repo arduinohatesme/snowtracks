@@ -1,6 +1,6 @@
 use crate::utils::{
-    Config, Task, TaskSize, TaskStatus, TaskTriage, TasksDatabase, add_hash_to_task,
-    get_config_path, get_database_object, get_database_path, get_from_args, get_input_in,
+    Config, Task, TaskSize, TaskStatus, TaskTriage, add_hash_to_task, get_config_path,
+    get_database_object, get_database_path, get_from_args, get_input_in,
 };
 use clap::ArgMatches;
 use std::{
